@@ -4,11 +4,12 @@ using System;
 using System.Collections;
 using System.Collections.Generic;
 using UnityEngine;
-using UnityEngine.Networking;
+using NativeWebSocket;
 
 public class WebSocketController
 {
-    private UnityWebRequest _webSocketRequest;
+    WebSocket _websocket;
+
     private Uri _serverUri;
     private bool _isConnected;
     private Coroutine _heartbeatCoroutine;
@@ -24,28 +25,46 @@ public class WebSocketController
     {
         if (_isConnected) return;
         
-        _webSocketRequest = UnityWebRequest.Get(_serverUri);
-        _webSocketRequest.SetRequestHeader("Upgrade", "websocket");
-        _webSocketRequest.SetRequestHeader("Connection", "Upgrade");
-        _webSocketRequest.downloadHandler = new DownloadHandlerBuffer();
-        _webSocketRequest.SendWebRequest();
-        
-        NetworkManager.Instance.StartCoroutine(WaitForConnection());
-    }
+        // TODO 这里引用NativeWebSocket，使用NativeWebSocket创建WebSocket
+        websocket = new WebSocket("ws://localhost:3000");
 
-    private IEnumerator WaitForConnection()
-    {
-        while (!_webSocketRequest.isDone)
+        websocket.OnOpen += () =>
         {
-            if (_webSocketRequest.result == UnityWebRequest.Result.ConnectionError)
-            {
-                Debug.LogError($"WebSocket connection error: {_webSocketRequest.error}");
-                yield break;
-            }
-            yield return null;
-        }
+        Debug.Log("Connection open!");
+        };
 
-        if (_webSocketRequest.responseCode == 101) // Switching Protocols
+        websocket.OnError += (e) =>
+        {
+        Debug.Log("Error! " + e);
+        };
+
+        websocket.OnClose += (e) =>
+        {
+        Debug.Log("Connection closed!");
+        };
+
+        websocket.OnMessage += (bytes) =>
+        {
+            Debug.Log("OnMessage!");
+            Debug.Log(bytes);
+
+            // getting the message as a string
+            // var message = System.Text.Encoding.UTF8.GetString(bytes);
+            // Debug.Log("OnMessage! " + message);
+        };
+
+        // waiting for messages
+        await websocket.Connect();
+        // _webSocketRequest = UnityWebRequest.Get(_serverUri);
+        // _webSocketRequest.SetRequestHeader("Upgrade", "websocket");
+        // _webSocketRequest.SetRequestHeader("Connection", "Upgrade");
+        // _webSocketRequest.downloadHandler = new DownloadHandlerBuffer();
+        // _webSocketRequest.SendWebRequest();
+        
+        // NetworkManager.Instance.StartCoroutine(WaitForConnection());
+
+
+        if (websocket.State == WebSocketState.Open)
         {
             _isConnected = true;
             StartHeartbeat();
